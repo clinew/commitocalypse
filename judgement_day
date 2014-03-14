@@ -1,0 +1,114 @@
+#!/bin/bash
+#
+# Simple script that creates a keyfile using a loopback device and the kernel
+# random-number generator.
+# Copyright (C) 2014 Wade T. Cline
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+# Number of commits to make.
+COMMIT_COUNT=42
+# The date with which to cmmit with.
+DATE=""
+# The span of dates within which to make commits.
+DAY_BEGIN=1
+DAY_CURRENT=1
+DAY_END=0
+DAYS_END=(31 28 31 30 31 30 31 31 30 31 30 31)
+# Directory with which to create the ridiculous "project" in.
+DIRECTORY="repository"
+# File to add the commits to.
+FILE="main.c"
+# Span of years within which to make commits.
+MONTH_BEGIN=1
+MONTH_CURRENT=1
+MONTH_END=12
+# Number of seconds to increment the date by per commit.
+SECONDS_INCREMENT="setme"
+# Number of seconds in a day.
+SECONDS_PER_DAY=$((60*60*24))
+# Span of years within which to make commits.
+YEAR_BEGIN=$((`date +%Y`-1))
+YEAR_CURRENT=${YEAR_BEGIN}
+YEAR_END=$((${YEAR_BEGIN}+4))
+
+
+# Creates a single commit in the project.
+commit() {
+#	echo "// ${DATE}." >> "${FILE}"
+	echo ";" >> "${FILE}"
+	git add "${FILE}"
+	git commit -m "${DATE}" --date="${DATE}"
+}
+
+# Create a commit for each commit count in the day.
+commits() {
+	local SECOND
+	local SECONDS_TOTAL
+	local MINUTE
+	local HOUR
+
+	SECONDS_TOTAL=0
+	for (( i=0 ; i < ${COMMIT_COUNT} ; i+=1 )); do
+		# Increment the date.
+		SECOND=$((SECONDS_TOTAL % 60))
+		MINUTE=$((SECONDS_TOTAL / 60 % 60))
+		HOUR=$((SECONDS_TOTAL / 60 / 60))
+		SECONDS_TOTAL=$((${SECONDS_TOTAL} + ${SECONDS_INCREMENT}))
+		DATE=`date -R --date=${YEAR_CURRENT}-${MONTH_CURRENT}-${DAY_CURRENT}T${HOUR}:${MINUTE}:${SECOND}`
+
+		# Create the commit.
+		commit
+	done
+}
+
+SECONDS_INCREMENT=$((${SECONDS_PER_DAY} / ${COMMIT_COUNT}))
+
+# Create a project.
+if [[ -e ${DIRECTORY} ]]; then
+	echo "Directory '${DIRECTORY}' already exists."
+	exit 1
+fi
+mkdir -p ${DIRECTORY}
+cd ${DIRECTORY}
+git init
+
+# Create commits for each year.
+while (( ${YEAR_CURRENT} <= ${YEAR_END} )); do
+	# Create commits for each month.
+	MONTH_CURRENT=${MONTH_BEGIN}
+	while (( ${MONTH_CURRENT} <= ${MONTH_END} )); do	
+		# Figure out the ending date. Fuck the Gregorian Calendar.
+		DAY_END=${DAYS_END[${MONTH_CURRENT}-1]}
+		if [[ ${MONTH_CURRENT} -eq 2 ]]; then
+			if [[ $((${YEAR_CURRENT} % 4)) -eq 0 ]]; then
+			      DAY_END=29
+			fi
+		fi
+
+		# Create commits for each day.
+		DAY_CURRENT=${DAY_BEGIN}
+		while (( ${DAY_CURRENT} <= ${DAY_END} )); do
+			# Create the commits for the day.
+			commits
+			DAY_CURRENT=$((${DAY_CURRENT} + 1))
+		done
+		MONTH_CURRENT=$((${MONTH_CURRENT} + 1))
+	done
+	YEAR_CURRENT=$((${YEAR_CURRENT}+1))
+done
+
+# Push project.
+#TODO
